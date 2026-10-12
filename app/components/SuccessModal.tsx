@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
+import { decodeItems } from '@/lib/mockData';
 
 export type ReceiptDelivery = 'ble' | 'local' | 'none';
 
 export type Settlement = {
   orderId: string;
   amount: number;
+  items: string;
   revenueBefore: number;
   revenueAfter: number;
   bufferedCount: number;
@@ -28,7 +30,19 @@ export function SuccessModal({ settlement, onClose }: { settlement: Settlement; 
         ORDER {s.orderId} VERIFIED
         <br />₹{s.amount} SETTLED
       </h2>
-      <div className="mt-5 w-full max-w-xs space-y-1.5 rounded-2xl bg-black/10 p-3 text-left font-mono text-xs">
+      {s.items && (
+        <ul className="mt-4 w-full max-w-xs space-y-0.5 rounded-2xl bg-black/15 p-3 text-left text-sm font-bold">
+          {decodeItems(s.items).map((l) => (
+            <li key={l.id} className="flex justify-between">
+              <span>
+                {l.qty} × {l.item?.name ?? l.id}
+              </span>
+              <span className="font-mono">₹{l.lineTotal}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 w-full max-w-xs space-y-1.5 rounded-2xl bg-black/10 p-3 text-left font-mono text-xs">
         <div className="flex justify-between">
           <span>Shift revenue</span>
           <span className="font-bold">

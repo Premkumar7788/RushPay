@@ -34,7 +34,7 @@ const none = new Set<string>();
 const REG_NO = '21BCE1234';
 const walletA = await createStudentWallet(REG_NO, 320);
 const walletB = await createStudentWallet('22BIT5678', 320);
-const tokenA = await createPaymentToken(walletA, { orderId: '#104', amount: 80 });
+const tokenA = await createPaymentToken(walletA, { orderId: '#104', amount: 80, items: 'paneer-roll*1' });
 
 await test('1 valid token → ok, all 6 checks pass, < 300ms', async () => {
   const r = await verifyToken(tokenA, { usedNonces: none });
@@ -153,6 +153,29 @@ await test('13 PII check has no false positives across 2000 random nonces', asyn
     const r = await verifyToken(t, { usedNonces: none });
     if (!r.ok) throw new Error(`run ${i}: ${r.reason} ${r.checks.find((c) => !c.ok)?.detail}`);
   }
+});
+
+await test('14 order items are signed: changing them breaks the signature', async () => {
+  eq(decodeToken(tokenA)?.payload.items, 'paneer-roll*1', 'items carried in token');
+  const parts = tokenA.split('.');
+  parts[1] = toB64(JSON.stringify({ ...JSON.parse(b64(parts[1])), items: 'paneer-roll*3' }));
+  failedOn(await verifyToken(parts.join('.'), { usedNonces: none }), 'SIGNATURE_MISMATCH', 'SIGNATURE');
+});
+
+await test('15 items field cannot carry personal data', async () => {
+  for (const items of ['9876543210*1', 'student@okaxis*1', '21BCE1234', 'paneer roll*1']) {
+    const t = await createPaymentToken(walletA, { orderId: '#111', amount: 80, items });
+    const r = await verifyToken(t, { usedNonces: none });
+    eq(r.ok, false, `ok for ${items}`);
+    eq(r.checks.find((c) => c.name === 'PII')?.ok, false, `PII check for ${items}`);
+  }
+});
+
+await test('16 multi-item order verifies; empty items allowed', async () => {
+  const t = await createPaymentToken(walletA, { orderId: '#112', amount: 190, items: 'paneer-roll*1,corn-sandwich*1,lime-juice*1' });
+  eq((await verifyToken(t, { usedNonces: none })).ok, true, 'multi-item ok');
+  const e = await createPaymentToken(walletA, { orderId: '#113', amount: 40 });
+  eq((await verifyToken(e, { usedNonces: none })).ok, true, 'empty items ok');
 });
 
 console.log(failures ? `\n${failures} test(s) failed` : '\nAll tests passed');

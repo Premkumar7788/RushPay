@@ -7,6 +7,8 @@ interface CountdownRingProps {
   initialSeconds?: number;
   isActive: boolean;
   onExpire?: () => void;
+  /** Change this to restart the countdown from initialSeconds (e.g. a regenerated QR). */
+  resetKey?: number | string;
   size?: number;
   strokeWidth?: number;
 }
@@ -16,10 +18,19 @@ export const CountdownRing: React.FC<CountdownRingProps> = ({
   initialSeconds = 60,
   isActive,
   onExpire,
+  resetKey,
   size = 110,
   strokeWidth = 7,
 }) => {
   const [secondsRemaining, setSecondsRemaining] = useState(initialSeconds);
+
+  // Reset during render (not in an effect) so the expiry effect below never sees the stale 0
+  // in the same commit that re-activates the ring.
+  const [seenResetKey, setSeenResetKey] = useState(resetKey);
+  if (seenResetKey !== resetKey) {
+    setSeenResetKey(resetKey);
+    setSecondsRemaining(initialSeconds);
+  }
 
   useEffect(() => {
     setSecondsRemaining(initialSeconds);

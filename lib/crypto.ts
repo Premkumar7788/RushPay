@@ -9,9 +9,9 @@
  *
  * STUDENT (StudentView.tsx):
  *   const wallet = loadWallet() ?? await createStudentWallet('21BCE1234', 320); saveWallet(wallet);
- *   const token = await createPaymentToken(wallet, { orderId: nextOrderId(), amount: 80 });
+ *   const token = await createPaymentToken(wallet, { orderId: nextOrderId(), amount: 80, items: 'paneer-roll*1' });
  *   // every ~10s while the ring runs, refresh the QR with the SAME nonce:
- *   const fresh = await createPaymentToken(wallet, { orderId, amount, nonce: decodeToken(token)!.payload.nonce });
+ *   const fresh = await createPaymentToken(wallet, { orderId, amount, items, nonce: decodeToken(token)!.payload.nonce });
  *
  * VENDOR (VendorView.tsx):
  *   const r = await verifyToken(token, { usedNonces: getUsedNonces() });  // r.checks drives the console
@@ -65,7 +65,9 @@ export async function sha256Hex(input: string): Promise<string> {
 
 // Fixed key order so signer and verifier hash identical bytes.
 function canonicalPayload(p: PaymentPayload): string {
-  return JSON.stringify({ orderId: p.orderId, amount: p.amount, timestamp: p.timestamp, nonce: p.nonce, studentHash: p.studentHash });
+  return JSON.stringify({
+    orderId: p.orderId, amount: p.amount, items: p.items, timestamp: p.timestamp, nonce: p.nonce, studentHash: p.studentHash,
+  });
 }
 
 function publicJwk(k: JsonWebKey): JsonWebKey {
@@ -129,14 +131,19 @@ function encodeToken(payloadJson: string, sig: string, sv: SignedVoucher): Payme
   return [TOKEN_PREFIX, toB64url(enc.encode(payloadJson)), sig, toB64url(enc.encode(JSON.stringify(sv)))].join('.');
 }
 
-/** Signs a payment on-device. Reuse `nonce` with a new timestamp to refresh the dynamic QR. */
+/**
+ * Signs a payment on-device. Reuse `nonce` with a new timestamp to refresh the dynamic QR.
+ * `items` is the order in menu-id form ("paneer-roll*2,lime-juice*1"); it is signed, so the vendor sees
+ * exactly what was paid for.
+ */
 export async function createPaymentToken(
   wallet: WalletSecrets,
-  opts: { orderId: string; amount: number; nonce?: string; timestamp?: number },
+  opts: { orderId: string; amount: number; items?: string; nonce?: string; timestamp?: number },
 ): Promise<PaymentToken> {
   const payloadJson = canonicalPayload({
     orderId: opts.orderId,
     amount: opts.amount,
+    items: opts.items ?? '',
     timestamp: opts.timestamp ?? Date.now(),
     nonce: opts.nonce ?? randomHex(16),
     studentHash: wallet.studentHash,
@@ -150,7 +157,7 @@ type Decoded = { payload: PaymentPayload; payloadBytes: Uint8Array<ArrayBuffer>;
 function isPayload(x: unknown): x is PaymentPayload {
   const p = x as PaymentPayload;
   return !!p && typeof p === 'object' && typeof p.orderId === 'string' && typeof p.amount === 'number'
-    && typeof p.timestamp === 'number' && typeof p.nonce === 'string' && typeof p.studentHash === 'string';
+    && typeof p.items === 'string' && typeof p.timestamp === 'number' && typeof p.nonce === 'string' && typeof p.studentHash === 'string';
 }
 
 function isSignedVoucher(x: unknown): x is SignedVoucher {
@@ -204,7 +211,9 @@ const REASONS: Record<CheckName, string> = {
 };
 
 const ORDER: CheckName[] = ['VOUCHER', 'SIGNATURE', 'FRESHNESS', 'NONCE', 'AMOUNT', 'PII'];
-const PAYLOAD_KEYS = ['orderId', 'amount', 'timestamp', 'nonce', 'studentHash'];
+const PAYLOAD_KEYS = ['orderId', 'amount', 'items', 'timestamp', 'nonce', 'studentHash'];
+// Menu ids must start with a letter, so digits (phone numbers, reg numbers) can't be smuggled in as items.
+const ITEMS_RE = /^(?:[a-z][a-z0-9-]{0,31}\*[1-9]\d?(?:,[a-z][a-z0-9-]{0,31}\*[1-9]\d?){0,19})?$/;
 const PII_PATTERNS: [RegExp, string][] = [
   [/\b[6-9]\d{9}\b/, 'phone number'],
   [/@/, 'UPI VPA'],
@@ -298,9 +307,11 @@ export async function verifyToken(
     ? check('PII', false, `Unexpected fields: ${extraKeys.join(', ') || 'schema mismatch'}`)
     : !/^[0-9a-f]{16}$/.test(payload.studentHash) || !/^[0-9a-f]{32}$/.test(payload.nonce)
       ? check('PII', false, 'Identifiers are not opaque hashes')
-      : leak
-        ? check('PII', false, `Possible ${leak[1]} in orderId`)
-        : check('PII', true, 'PASSED (pseudonymous hash only)');
+      : !ITEMS_RE.test(payload.items)
+        ? check('PII', false, 'Order items are not plain menu ids')
+        : leak
+          ? check('PII', false, `Possible ${leak[1]} in orderId`)
+          : check('PII', true, 'PASSED (pseudonymous hash only)');
 
   const checks = [voucherCheck, sigCheck, freshCheck, nonceCheck, amountCheck, piiCheck];
   const failed = checks.find((c) => !c.ok);

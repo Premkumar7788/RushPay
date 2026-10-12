@@ -12,11 +12,12 @@ import { appendLedger, commitNonce, getBufferedCount, getShiftRevenue, getUsedNo
 import type { ChannelMessage, PaymentToken, VerifyResult } from '@/lib/types';
 import { AttackPanel, type AttackKind } from './AttackPanel';
 import { Ledger } from './Ledger';
+import { OrdersView } from './OrdersView';
 import { ScannerZone } from './ScannerZone';
 import { SuccessModal, type ReceiptDelivery, type Settlement } from './SuccessModal';
 import { REVEAL_STEP_MS, VerifyConsole } from './VerifyConsole';
 
-type Tab = 'scan' | 'attack' | 'ledger';
+type Tab = 'scan' | 'orders' | 'attack' | 'ledger';
 type Accepted = { token: PaymentToken; nonce: string; orderId: string; amount: number };
 
 const REASON_TEXT: Record<string, string> = {
@@ -98,6 +99,7 @@ export function VendorView({ framed = false, sameDevice = false }: { framed?: bo
             setSettlement({
               orderId: p.orderId,
               amount: p.amount,
+              items: p.items,
               revenueBefore,
               revenueAfter: getShiftRevenue(),
               bufferedCount: getBufferedCount(),
@@ -233,14 +235,14 @@ export function VendorView({ framed = false, sameDevice = false }: { framed?: bo
         </header>
 
         {/* Tabs */}
-        <nav className="grid grid-cols-3 gap-1 rounded-2xl bg-gray-900 p-1 text-xs font-bold">
-          {(['scan', 'attack', 'ledger'] as Tab[]).map((t) => (
+        <nav className="grid grid-cols-4 gap-1 rounded-2xl bg-gray-900 p-1 text-xs font-bold">
+          {(['scan', 'orders', 'attack', 'ledger'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`rounded-xl py-2 ${tab === t ? 'bg-gray-800 text-white' : 'text-gray-500'}`}
             >
-              {t === 'scan' ? 'Scan' : t === 'attack' ? 'Attacks' : 'Ledger'}
+              {{ scan: 'Scan', orders: 'Orders', attack: 'Attacks', ledger: 'Ledger' }[t]}
             </button>
           ))}
         </nav>
@@ -270,9 +272,10 @@ export function VendorView({ framed = false, sameDevice = false }: { framed?: bo
           </>
         )}
         {tab === 'attack' && <AttackPanel lastOrderId={lastAccepted?.orderId ?? null} onAttack={(k) => void runAttack(k)} />}
+        {tab === 'orders' && <OrdersView />}
         {tab === 'ledger' && <Ledger />}
 
-        {result && tab !== 'ledger' && <VerifyConsole result={result.r} revealKey={result.key} title={result.title} />}
+        {result && (tab === 'scan' || tab === 'attack') && <VerifyConsole result={result.r} revealKey={result.key} title={result.title} />}
 
         <p className="text-center text-[9px] text-gray-500">
           ECDSA P-256 · IS 19671 (TTL, nonce, anti-tamper) · IS 17428 (pseudonymous) · ISO/IEC 27001 (hash-chained audit log)

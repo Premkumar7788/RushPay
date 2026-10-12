@@ -19,7 +19,7 @@ let serviceUUID = CBUUID(string: "B5E3F0A0-6D1C-4E8A-9A5E-7275736870A1")
 let ackUUID = CBUUID(string: "B5E3F0A1-6D1C-4E8A-9A5E-7275736870A1")
 let tokenUUID = CBUUID(string: "B5E3F0A2-6D1C-4E8A-9A5E-7275736870A1")
 let tokenVersionUUID = CBUUID(string: "B5E3F0A3-6D1C-4E8A-9A5E-7275736870A1")
-let localName = "RushPay-Student"
+let localName = "RushPay"  // short: flags + 128-bit service UUID + name must fit the 31-byte advert
 
 func emit(_ event: String, _ fields: [String: Any] = [:]) {
     var obj = fields

@@ -3,7 +3,9 @@ export const TTL_MS = 60_000;          // IS 19671: 60-second token time-to-live
 export const TXN_CAP = 500;            // ₹ per-transaction cap (verify current RBI limit)
 
 export type PaymentPayload = {
-  orderId: string; amount: number; timestamp: number; nonce: string; studentHash: string;
+  orderId: string; amount: number;
+  items: string;  // signed order contents as menu ids, e.g. "paneer-roll*2,lime-juice*1" (no personal data)
+  timestamp: number; nonce: string; studentHash: string;
 };
 export type Voucher = {
   serial: string; studentHash: string; devicePubKey: JsonWebKey; limit: number; expiresAt: number;
@@ -31,4 +33,5 @@ export type LedgerRow = {
   index: number; orderId: string; amount: number; timestamp: number; nonce: string;
   voucherSerial: string; voucherLimit: number; tokenHash: string;
   prevHash: string; rowHash: string; status: LedgerStatus;
+  items?: string; studentHash?: string;  // optional so rows written before these fields still verify
 };

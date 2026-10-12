@@ -25,7 +25,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { ChannelMessage, LedgerRow, WalletSecrets } from '@/lib/types';
-import { DEFAULT_BALANCE, FIRST_LIVE_ORDER, SEED_ORDERS, SEED_VOUCHER_LIMIT } from '@/lib/mockData';
+import { DEFAULT_BALANCE, FIRST_LIVE_ORDER, SEED_ORDERS, SEED_VOUCHER_LIMIT, seedItems } from '@/lib/mockData';
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -340,10 +340,11 @@ function randomHex(bytes: number): string {
 }
 
 // Status is deliberately excluded so settlement can update it without breaking the chain.
+// items/studentHash are appended only when present, so rows written before they existed still verify.
 function hashInput(r: Omit<LedgerRow, 'rowHash' | 'status'>): string {
-  return r.prevHash + JSON.stringify([
-    r.index, r.orderId, r.amount, r.timestamp, r.nonce, r.voucherSerial, r.voucherLimit, r.tokenHash,
-  ]);
+  const fields: unknown[] = [r.index, r.orderId, r.amount, r.timestamp, r.nonce, r.voucherSerial, r.voucherLimit, r.tokenHash];
+  if (r.items !== undefined || r.studentHash !== undefined) fields.push(r.items ?? null, r.studentHash ?? null);
+  return r.prevHash + JSON.stringify(fields);
 }
 
 export function getLedger(): LedgerRow[] {
@@ -353,6 +354,7 @@ export function getLedger(): LedgerRow[] {
 export type LedgerEntry = {
   orderId: string; amount: number; timestamp: number; nonce: string;
   voucherSerial: string; voucherLimit: number; token: string;
+  items?: string; studentHash?: string;
 };
 
 let ledgerQueue: Promise<unknown> = Promise.resolve();
@@ -372,6 +374,7 @@ export function appendLedger(e: LedgerEntry): Promise<LedgerRow> {
       voucherLimit: e.voucherLimit,
       tokenHash: await sha256Hex(e.token),
       prevHash: prev ? prev.rowHash : 'GENESIS',
+      ...(e.items !== undefined || e.studentHash !== undefined ? { items: e.items ?? '', studentHash: e.studentHash ?? '' } : {}),
     };
     const row: LedgerRow = { ...base, rowHash: await sha256Hex(hashInput(base)), status: 'BUFFERED' };
     writeJSON(K.ledger, [...ledger, row]);
@@ -471,6 +474,8 @@ export function seedDemo(): Promise<void> {
           voucherSerial: 'seed-' + randomHex(6),
           voucherLimit: SEED_VOUCHER_LIMIT,
           token: 'seed:' + o.orderId + ':' + nonce,
+          items: seedItems(o),
+          studentHash: randomHex(8),
         });
         commitNonce(nonce);
       }
