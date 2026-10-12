@@ -572,16 +572,16 @@ export const StudentView: React.FC = () => {
               </div>
 
               {/* Dual Row: Countdown Ring & BLE Radar */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-gray-900 rounded-2xl p-2 border border-gray-800 flex flex-col items-center justify-center">
+              <div className="grid grid-cols-2 items-stretch gap-2">
+                <div className="bg-gray-900 rounded-2xl p-3 border border-gray-800 flex flex-col items-center justify-center">
                   <CountdownRing
                     totalSeconds={60}
                     initialSeconds={60}
                     isActive={!isExpired && !settledResult}
                     onExpire={handleExpire}
                     resetKey={sessionKey}
-                    size={80}
-                    strokeWidth={5}
+                    size={84}
+                    strokeWidth={6}
                   />
                 </div>
 
