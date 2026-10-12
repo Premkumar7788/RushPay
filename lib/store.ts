@@ -248,6 +248,19 @@ function applyNetworkGuard(on: boolean): void {
   }
 }
 
+// Captured before any guard is installed, for the on-device BLE bridge only.
+const nativeFetch: typeof fetch | undefined = typeof fetch === 'function' ? fetch.bind(globalThis) : undefined;
+
+/**
+ * Talks to the BLE bridge running on this same machine (same origin: /ble/*). It is not internet access,
+ * so it keeps working in offline mode. Any other URL is refused.
+ */
+export function localLinkFetch(path: string, init?: RequestInit): Promise<Response> {
+  if (!path.startsWith('/ble/')) return Promise.reject(new Error('localLinkFetch only reaches the local BLE bridge'));
+  if (!nativeFetch) return Promise.reject(new Error('fetch unavailable'));
+  return nativeFetch(path, init);
+}
+
 /** Note: in `next dev` this also blocks hot reload's WebSocket. Use a production build for the demo. */
 export function setOfflineMode(on: boolean): void {
   applyNetworkGuard(on);

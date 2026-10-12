@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "serve": "npx serve out",
+    "demo": "next build && npm run ble:build && node ble-bridge/bridge.mjs",
+    "serve": "node ble-bridge/bridge.mjs --no-ble",
+    "ble:build": "mkdir -p ble-bridge/.build && swiftc -O -swift-version 5 ble-bridge/RushPayPeripheral.swift -o ble-bridge/.build/rushpay-peripheral -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker ble-bridge/Info.plist",
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/test-store.ts && (test ! -f scripts/test-crypto.ts || tsx scripts/test-crypto.ts)"
   },

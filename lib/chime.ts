@@ -27,6 +27,12 @@ function tone(ac: AudioContext, freq: number, start: number, dur: number, type: 
   osc.stop(start + dur + 0.02);
 }
 
+/** Call from a tap handler (e.g. "Start scanner") so later chimes can play on mobile browsers. */
+export function unlockAudio(): void {
+  const ac = audio();
+  if (ac) tone(ac, 440, ac.currentTime, 0.02, 'sine', 0.0002);
+}
+
 /** Success: a bright two-note bell (~400ms). */
 export function playChime(): void {
   const ac = audio();

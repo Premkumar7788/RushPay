@@ -510,8 +510,8 @@ export const StudentView: React.FC = () => {
                   {activeToken ? (
                     <QRCodeSVG
                       value={activeToken}
-                      size={150}
-                      level="M"
+                      size={260}
+                      level="L"
                       includeMargin={false}
                     />
                   ) : (
