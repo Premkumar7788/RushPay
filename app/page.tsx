@@ -5,6 +5,8 @@
 // ?role=student or ?role=vendor shows a single view (run each in its own window for the demo).
 import { useEffect, useState } from 'react';
 import { seedDemo } from '@/lib/store';
+import { StudentView } from './components/StudentView';
+import { VendorSimulator } from './components/VendorSimulator';
 
 type Role = 'both' | 'student' | 'vendor';
 
@@ -29,9 +31,10 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:flex-row md:p-8">
-      {role !== 'vendor' && <Placeholder title="StudentView" owner="Member B — app/components/StudentView.tsx" />}
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:flex-row md:p-8 relative">
+      {role !== 'vendor' && <StudentView />}
       {role !== 'student' && <Placeholder title="VendorView" owner="Member C — app/components/VendorView.tsx" />}
+      <VendorSimulator />
     </main>
   );
 }
