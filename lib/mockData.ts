@@ -46,3 +46,40 @@ export const SEED_ORDERS: SeedOrder[] = RAW_SEED.map((o) => ({
 export const FIRST_LIVE_ORDER = 104;
 export const DEFAULT_BALANCE = 320;
 export const SEED_VOUCHER_LIMIT = 2000;
+
+// ---------------------------------------------------------------------------
+// Order items <-> compact signed string ("paneer-roll*2,lime-juice*1")
+// ---------------------------------------------------------------------------
+
+export type OrderLine = { id: string; qty: number; item?: MenuItem; lineTotal: number };
+
+/** Cart (menu id → quantity) to the compact form carried in the signed payment payload. */
+export function encodeItems(cart: Record<string, number>): string {
+  return Object.entries(cart)
+    .filter(([, qty]) => qty > 0)
+    .map(([id, qty]) => `${id}*${qty}`)
+    .join(',');
+}
+
+/** Compact form back to lines with menu names and prices. Unknown ids are kept, with no item. */
+export function decodeItems(items: string | undefined): OrderLine[] {
+  if (!items) return [];
+  return items.split(',').map((part) => {
+    const [id, q] = part.split('*');
+    const qty = Number(q) || 0;
+    const item = MENU.find((m) => m.id === id);
+    return { id, qty, item, lineTotal: (item?.price ?? 0) * qty };
+  });
+}
+
+/** Menu-price total of an items string, to cross-check against the signed amount. */
+export function itemsTotal(items: string | undefined): number {
+  return decodeItems(items).reduce((sum, l) => sum + l.lineTotal, 0);
+}
+
+/** Seed order items in the same compact form. */
+export function seedItems(o: SeedOrder): string {
+  const cart: Record<string, number> = {};
+  for (const id of o.items) cart[id] = (cart[id] ?? 0) + 1;
+  return encodeItems(cart);
+}

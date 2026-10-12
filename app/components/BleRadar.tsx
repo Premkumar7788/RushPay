@@ -14,7 +14,7 @@ export const BleRadar: React.FC<BleRadarProps> = ({
   rssi = -54,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-900 text-white border border-gray-800 shadow-inner overflow-hidden relative">
+    <div className="flex flex-col items-center justify-center gap-1 p-3 rounded-2xl bg-gray-900 text-white border border-gray-800 shadow-inner overflow-hidden relative">
       {/* Radar ripple container */}
       <div className="relative w-20 h-20 flex items-center justify-center my-1">
         {/* Animated concentric rings */}
@@ -57,21 +57,19 @@ export const BleRadar: React.FC<BleRadarProps> = ({
         </div>
       </div>
 
-      {/* Radar status information */}
-      <div className="z-10 text-center space-y-0.5">
-        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-          Proximity Beacon Broadcasting
+      {/* Radar status information (stacked so it fits a half-width card) */}
+      <div className="z-10 w-full min-w-0 space-y-1 text-center">
+        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+          <span className="h-1.5 w-1.5 shrink-0 animate-ping rounded-full bg-emerald-400" />
+          <span className="truncate">{isBroadcasting ? 'Broadcasting' : 'Idle'}</span>
         </div>
 
-        <div className="text-[11px] font-mono text-gray-300 flex items-center justify-center gap-1.5">
-          <span>Target: <strong className="text-white">{stallName}</strong></span>
-          <span className="text-gray-500">|</span>
-          <span className="text-emerald-400">{rssi} dBm</span>
+        <div className="truncate text-[11px] font-semibold text-white" title={stallName}>
+          {stallName}
         </div>
 
-        <div className="text-[9px] text-gray-400 font-mono">
-          Channel: <span className="text-gray-300">rushpay-ble</span> • Airgap Proximity
+        <div className="font-mono text-[9px] leading-snug text-gray-400">
+          <span className="text-emerald-400">{rssi} dBm</span> · rushpay-ble
         </div>
       </div>
     </div>

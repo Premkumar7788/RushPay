@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { MENU, STALL, DEFAULT_BALANCE, MenuItem } from '@/lib/mockData';
+import { MENU, STALL, DEFAULT_BALANCE, MenuItem, encodeItems, decodeItems } from '@/lib/mockData';
 import {
   createStudentWallet,
   createPaymentToken,
@@ -41,6 +41,9 @@ export const StudentView: React.FC = () => {
   const [activeOrderId, setActiveOrderId] = useState<string>('');
   const [activeAmount, setActiveAmount] = useState<number>(0);
   const [activeToken, setActiveToken] = useState<string>('');
+  const [activeItems, setActiveItems] = useState<string>('');
+  // Bumped for every new 60s QR session so the countdown ring restarts (Regenerate used to re-expire instantly).
+  const [sessionKey, setSessionKey] = useState(0);
   const [reSignCount, setReSignCount] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
   const [settledResult, setSettledResult] = useState<{
@@ -100,11 +103,12 @@ export const StudentView: React.FC = () => {
 
   // Dynamic Re-signing: fresh timestamp every ~10s while preserving the same nonce
   const reSignPayment = useCallback(
-    async (currentWallet: WalletSecrets, orderId: string, amount: number, existingNonce?: string) => {
+    async (currentWallet: WalletSecrets, orderId: string, amount: number, items: string, existingNonce?: string) => {
       try {
         const token = await createPaymentToken(currentWallet, {
           orderId,
           amount,
+          items,
           nonce: existingNonce,
         });
         setActiveToken(token);
@@ -125,16 +129,19 @@ export const StudentView: React.FC = () => {
 
     const orderId = nextOrderId();
     const amount = subtotal;
+    const items = encodeItems(cart);
 
     setActiveOrderId(orderId);
     setActiveAmount(amount);
+    setActiveItems(items);
+    setSessionKey((k) => k + 1);
     setIsExpired(false);
     setSettledResult(null);
     setRejectReason(null);
     setReSignCount(0);
     setIsPaying(true);
 
-    const initialToken = await reSignPayment(wallet, orderId, amount);
+    const initialToken = await reSignPayment(wallet, orderId, amount, items);
     if (!initialToken) return;
 
     const decoded = decodeToken(initialToken);
@@ -143,7 +150,7 @@ export const StudentView: React.FC = () => {
     // Dynamic re-signing timer (every 10s with the SAME nonce)
     if (reSignIntervalRef.current) clearInterval(reSignIntervalRef.current);
     reSignIntervalRef.current = setInterval(() => {
-      void reSignPayment(wallet, orderId, amount, nonce);
+      void reSignPayment(wallet, orderId, amount, items, nonce);
     }, 10000);
   };
 
@@ -160,9 +167,10 @@ export const StudentView: React.FC = () => {
     if (!wallet || !activeOrderId) return;
     setIsExpired(false);
     setRejectReason(null);
+    setSessionKey((k) => k + 1);
 
     // Fresh nonce for new 60s lifecycle
-    const freshToken = await reSignPayment(wallet, activeOrderId, activeAmount);
+    const freshToken = await reSignPayment(wallet, activeOrderId, activeAmount, activeItems);
     if (!freshToken) return;
 
     const decoded = decodeToken(freshToken);
@@ -170,9 +178,18 @@ export const StudentView: React.FC = () => {
 
     if (reSignIntervalRef.current) clearInterval(reSignIntervalRef.current);
     reSignIntervalRef.current = setInterval(() => {
-      void reSignPayment(wallet, activeOrderId, activeAmount, nonce);
+      void reSignPayment(wallet, activeOrderId, activeAmount, activeItems, nonce);
     }, 10000);
   };
+
+  // TTL elapsed: stop re-signing so no fresh token for this nonce is produced after expiry (IS 19671).
+  const handleExpire = useCallback(() => {
+    if (reSignIntervalRef.current) {
+      clearInterval(reSignIntervalRef.current);
+      reSignIntervalRef.current = null;
+    }
+    setIsExpired(true);
+  }, []);
 
   // Channel Listener for PAYMENT_ACK
   useEffect(() => {
@@ -493,6 +510,14 @@ export const StudentView: React.FC = () => {
                 </div>
               </div>
 
+              {activeItems && (
+                <div className="px-1 text-[10px] text-gray-400">
+                  {decodeItems(activeItems)
+                    .map((l) => `${l.qty} × ${l.item?.name ?? l.id}`)
+                    .join(' · ')}
+                </div>
+              )}
+
               {/* Rejection Alert */}
               {rejectReason && (
                 <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[11px]">
@@ -510,8 +535,8 @@ export const StudentView: React.FC = () => {
                   {activeToken ? (
                     <QRCodeSVG
                       value={activeToken}
-                      size={150}
-                      level="M"
+                      size={260}
+                      level="L"
                       includeMargin={false}
                     />
                   ) : (
@@ -547,15 +572,16 @@ export const StudentView: React.FC = () => {
               </div>
 
               {/* Dual Row: Countdown Ring & BLE Radar */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-gray-900 rounded-2xl p-2 border border-gray-800 flex flex-col items-center justify-center">
+              <div className="grid grid-cols-2 items-stretch gap-2">
+                <div className="bg-gray-900 rounded-2xl p-3 border border-gray-800 flex flex-col items-center justify-center">
                   <CountdownRing
                     totalSeconds={60}
                     initialSeconds={60}
                     isActive={!isExpired && !settledResult}
-                    onExpire={() => setIsExpired(true)}
-                    size={80}
-                    strokeWidth={5}
+                    onExpire={handleExpire}
+                    resetKey={sessionKey}
+                    size={84}
+                    strokeWidth={6}
                   />
                 </div>
 

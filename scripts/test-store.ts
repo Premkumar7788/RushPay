@@ -4,7 +4,7 @@ import {
   getUsedNonces, memoryAdapter, nextOrderId, openChannel, resetDemo, seedDemo, setOfflineMode,
   setStorageAdapter, settleBatch, tamperLedgerForDemo, verifyLedgerChain,
 } from '@/lib/store';
-import { SEED_ORDERS } from '@/lib/mockData';
+import { SEED_ORDERS, decodeItems, encodeItems, itemsTotal } from '@/lib/mockData';
 import { TXN_CAP, type ChannelMessage, type LedgerRow } from '@/lib/types';
 
 let failures = 0;
@@ -167,6 +167,30 @@ await test('10 BroadcastChannel: message from A reaches B, not A', async () => {
     a.close();
     b.close();
   }
+});
+
+await test('11 seeded orders carry items that add up to their amounts', async () => {
+  await fresh();
+  for (const r of getLedger()) {
+    if (!r.items) throw new Error(`${r.orderId} has no items`);
+    eq(itemsTotal(r.items), r.amount, `${r.orderId} items total`);
+    eq(r.studentHash?.length, 16, `${r.orderId} payer hash`);
+  }
+});
+
+await test('12 items are stored, hashed, and old rows without items still verify', async () => {
+  await fresh();
+  await appendLedger(entry({ nonce: 'legacy' }));                                   // no items: old format
+  await appendLedger(entry({ orderId: '#105', nonce: 'new', items: 'paneer-roll*2', studentHash: 'ab'.repeat(8) }));
+  eq(getLedger()[15].items, 'paneer-roll*2', 'items stored');
+  eq((await verifyLedgerChain()).ok, true, 'chain valid with mixed rows');
+});
+
+await test('13 encodeItems / decodeItems round trip', () => {
+  const s = encodeItems({ 'paneer-roll': 2, 'lime-juice': 1, 'corn-sandwich': 0 });
+  eq(s, 'paneer-roll*2,lime-juice*1', 'encoded');
+  eq(decodeItems(s)[0].item?.name, 'Gazebo Paneer Tikka Roll', 'decoded name');
+  eq(itemsTotal(s), 200, 'total');
 });
 
 console.log(failures ? `\n${failures} test(s) failed` : '\nAll tests passed');

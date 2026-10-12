@@ -7,6 +7,8 @@ interface CountdownRingProps {
   initialSeconds?: number;
   isActive: boolean;
   onExpire?: () => void;
+  /** Change this to restart the countdown from initialSeconds (e.g. a regenerated QR). */
+  resetKey?: number | string;
   size?: number;
   strokeWidth?: number;
 }
@@ -16,10 +18,19 @@ export const CountdownRing: React.FC<CountdownRingProps> = ({
   initialSeconds = 60,
   isActive,
   onExpire,
+  resetKey,
   size = 110,
   strokeWidth = 7,
 }) => {
   const [secondsRemaining, setSecondsRemaining] = useState(initialSeconds);
+
+  // Reset during render (not in an effect) so the expiry effect below never sees the stale 0
+  // in the same commit that re-activates the ring.
+  const [seenResetKey, setSeenResetKey] = useState(resetKey);
+  if (seenResetKey !== resetKey) {
+    setSeenResetKey(resetKey);
+    setSecondsRemaining(initialSeconds);
+  }
 
   useEffect(() => {
     setSecondsRemaining(initialSeconds);
@@ -63,53 +74,51 @@ export const CountdownRing: React.FC<CountdownRingProps> = ({
     badgeColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
   }
 
-  return (
-    <div className="relative flex flex-col items-center justify-center select-none">
-      <svg
-        width={size}
-        height={size}
-        className="transform -rotate-90 transition-all duration-500"
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-gray-200 dark:text-gray-800"
-          fill="transparent"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          fill="transparent"
-          style={{
-            transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease',
-          }}
-        />
-      </svg>
+  // Text scales with the ring so it always sits inside the stroke.
+  const numberPx = Math.round(size * 0.3);
+  const unitPx = Math.round(size * 0.16);
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span
-          className="text-2xl font-black font-mono tracking-tight transition-colors"
-          style={{ color: strokeColor }}
-        >
-          {String(secondsRemaining).padStart(2, '0')}s
-        </span>
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-          TTL Window
-        </span>
+  return (
+    <div className="flex flex-col items-center gap-1.5 select-none">
+      {/* The overlay is positioned over the ring only (not the label/badge below), so it centres correctly. */}
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            className="text-gray-200 dark:text-gray-800"
+            fill="transparent"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            fill="transparent"
+            style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="font-mono font-black leading-none tabular-nums transition-colors"
+            style={{ color: strokeColor, fontSize: numberPx }}
+          >
+            {String(secondsRemaining).padStart(2, '0')}
+            <span style={{ fontSize: unitPx }}>s</span>
+          </span>
+        </div>
       </div>
 
-      <div
-        className={`mt-1.5 px-2 py-0.5 rounded-full border text-[9px] font-mono font-medium ${badgeColor}`}
-      >
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">TTL window</span>
+
+      <div className={`whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[9px] font-medium ${badgeColor}`}>
         IS 19671: Δt ≤ 60s
       </div>
     </div>

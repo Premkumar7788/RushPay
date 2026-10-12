@@ -1,40 +1,41 @@
 'use client';
 
-// Split-screen container. Members B and C replace the placeholders with
-// <StudentView /> and <VendorView /> from ./components once those exist.
-// ?role=student or ?role=vendor shows a single view (run each in its own window for the demo).
+// Role router.
+//   /?role=student  laptop: student UI + Bluetooth bridge link (run with `npm run demo`)
+//   /?role=vendor   Android phone: full-screen vendor PoS (rear-camera scanner + Web Bluetooth)
+//   /               both side by side on one screen (same-device channel; no camera or Bluetooth needed)
+//   add &dev=1      to show Member B's VendorSimulator dock
 import { useEffect, useState } from 'react';
 import { seedDemo } from '@/lib/store';
+import { BleBridgeLink } from './components/BleBridgeLink';
 import { StudentView } from './components/StudentView';
 import { VendorSimulator } from './components/VendorSimulator';
+import { VendorView } from './components/VendorView';
 
 type Role = 'both' | 'student' | 'vendor';
 
-function Placeholder({ title, owner }: { title: string; owner: string }) {
-  return (
-    <div className="flex min-h-[600px] flex-1 items-center justify-center rounded-3xl border-2 border-dashed border-gray-400/50 p-8 text-center">
-      <div>
-        <p className="text-lg font-semibold">{title}</p>
-        <p className="text-sm opacity-60">{owner}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
-  const [role, setRole] = useState<Role>('both');
+  const [role, setRole] = useState<Role | null>(null);
+  const [dev, setDev] = useState(false);
 
   useEffect(() => {
-    const r = new URLSearchParams(window.location.search).get('role');
-    if (r === 'student' || r === 'vendor') setRole(r);
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('role');
+    setRole(r === 'student' || r === 'vendor' ? r : 'both');
+    setDev(params.get('dev') === '1');
     void seedDemo();
   }, []);
 
+  if (!role) return null;
+
+  if (role === 'vendor') return <VendorView />;
+
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:flex-row md:p-8 relative">
-      {role !== 'vendor' && <StudentView />}
-      {role !== 'student' && <Placeholder title="VendorView" owner="Member C — app/components/VendorView.tsx" />}
-      <VendorSimulator />
+    <main className="relative mx-auto flex max-w-7xl flex-col items-start gap-6 p-4 md:flex-row md:justify-center md:p-8">
+      <StudentView />
+      {role === 'both' && <VendorView framed sameDevice />}
+      <BleBridgeLink />
+      {dev && <VendorSimulator />}
     </main>
   );
 }
